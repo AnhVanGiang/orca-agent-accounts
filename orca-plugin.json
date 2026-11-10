@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
+  "manifestVersion": 2,
+  "execution": "trusted-worker",
+  "id": "agent-accounts",
+  "name": "Agent Accounts",
+  "version": "0.1.0",
+  "description": "Pick which Claude Code and Codex account each repo or workspace runs its agents on, using the accounts you added in Orca. macOS only.",
+  "author": { "name": "AnhVanGiang", "url": "https://github.com/AnhVanGiang" },
+  "repository": "https://github.com/AnhVanGiang/orca-agent-accounts",
+  "license": "MIT",
+  "engines": { "orca": ">=1.4.248" },
+  "pluginApi": 1,
+  "main": "worker/main.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "accounts",
+        "title": "Agent accounts",
+        "icon": "agent",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "hooks": [{ "event": "agent.launch.before", "onError": "pass" }],
+    "events": [{ "on": "workspace.changed" }],
+    "commands": [
+      { "id": "showPanel", "title": "Agent accounts: show panel", "action": "sidebar.right.toggle" }
+    ],
+    "statusBarItems": [
+      { "id": "account", "icon": "agent", "text": "Accounts: default", "command": "showPanel" }
+    ]
+  },
+  "capabilities": [{ "kind": "storage:own" }, { "kind": "workspace:read" }]
+}
