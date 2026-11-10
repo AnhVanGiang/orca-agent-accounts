@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assert, mockHost, mountWorker, test } from 'orca/testing'
@@ -28,6 +28,9 @@ mkdirSync(gitdir, { recursive: true })
 mkdirSync(wt, { recursive: true })
 writeFileSync(join(gitdir, 'commondir'), '../..\n')
 writeFileSync(join(wt, '.git'), `gitdir: ${gitdir}\n`)
+
+claude('trusty', 'me@x')
+writeFileSync(join(data, 'claude-profiles/trusty/home/.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'me@x' }, keep: 1 }))
 
 const launch = (agent: string, workspaceId: string | null) => ({
   agent,
@@ -148,4 +151,37 @@ test('assign: concurrent writes keep both keys; unknown accounts and workspaces 
   // Clearing a key works even when its workspace is gone.
   await worker.request('accounts.assign', { provider: 'claude', path: '/gone', accountId: null })
   await worker.deactivate()
+})
+
+test('trust: only with a switcher account selected, and off leaves it alone', async () => {
+  const cfg = join(data, 'claude-profiles/trusty/home/.claude.json')
+  const read = () => JSON.parse(readFileSync(cfg, 'utf8'))
+  const selected = join(data, 'claude-profiles/selected-host')
+  const { worker, fire } = await mount({ claude: { [wt]: 'trusty' } })
+  // System default: Orca trusts the folder in the launch account itself.
+  await fire('claude', `r::${wt}`)
+  assert.equal(read().projects, undefined)
+  // A switcher account selected: Orca trusts there, so the plugin trusts the picked account.
+  writeFileSync(selected, join(data, 'claude-profiles/p1/home'))
+  await fire('claude', `r::${wt}`)
+  assert.equal(read().projects[realpathSync(wt)].hasTrustDialogAccepted, true)
+  assert.equal(read().keep, 1)
+  await worker.request('accounts.setTrust', { on: false })
+  await fire('claude', `r::${repo}`) // not assigned: untouched either way
+  assert.equal(read().projects[repo], undefined)
+  await worker.deactivate()
+  // Off: an assigned workspace is not trusted.
+  writeFileSync(cfg, JSON.stringify({ oauthAccount: { emailAddress: 'me@x' } }))
+  const off = await mount({ claude: { [wt]: 'trusty' } })
+  await off.worker.request('accounts.setTrust', { on: false })
+  await off.fire('claude', `r::${wt}`)
+  assert.equal(read().projects, undefined)
+  await off.worker.deactivate()
+  rmSync(selected)
+})
+
+test('trust: never the home folder', async () => {
+  const { grantTrust } = await import('./trust')
+  assert.equal(await grantTrust(join(data, 'claude-profiles/trusty/home'), home), 'too-broad')
+  assert.equal(await grantTrust(join(data, 'claude-profiles/trusty/home'), '/'), 'too-broad')
 })

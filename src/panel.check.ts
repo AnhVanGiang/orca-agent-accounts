@@ -26,7 +26,8 @@ const state = {
     ws('w4', 'feat-y', 'feat/y', '/r/ops/.wt/feat-y', '/r/ops')
   ],
   assignments: { claude: { 'repo:/r/ops': 'p1', '/r/app/.worktrees/fix-x': 'p1' }, codex: {} },
-  currentIds: ['w2']
+  currentIds: ['w2'],
+  trust: true
 }
 
 const withCodex = {

@@ -4,12 +4,34 @@
   "execution": "trusted-worker",
   "id": "agent-accounts",
   "name": "Agent Accounts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pick which Claude Code and Codex account each repo or workspace runs its agents on, using the accounts you added in Orca. macOS only.",
-  "author": { "name": "AnhVanGiang", "url": "https://github.com/AnhVanGiang" },
+  "author": {
+    "name": "AnhVanGiang",
+    "url": "https://github.com/AnhVanGiang"
+  },
   "repository": "https://github.com/AnhVanGiang/orca-agent-accounts",
   "license": "MIT",
-  "engines": { "orca": ">=1.4.248" },
+  "icon": "images/icon.png",
+  "cover": {
+    "path": "images/cover.png",
+    "alt": "Agent Accounts panel: a workspace on one Claude account and its repo on another, plus a Codex pick"
+  },
+  "screenshots": [
+    {
+      "path": "images/panel.png",
+      "alt": "The panel in dark and light themes",
+      "caption": "Pick per repo, or override one workspace"
+    },
+    {
+      "path": "images/two-repos.png",
+      "alt": "Two workspaces with the same name in different repos, each with its own picker",
+      "caption": "Same name in two repos: you pick, it never guesses"
+    }
+  ],
+  "engines": {
+    "orca": ">=1.4.248"
+  },
   "pluginApi": 1,
   "main": "worker/main.ts",
   "contributes": {
@@ -22,14 +44,39 @@
         "ui": "components"
       }
     ],
-    "hooks": [{ "event": "agent.launch.before", "onError": "pass" }],
-    "events": [{ "on": "workspace.changed" }],
+    "hooks": [
+      {
+        "event": "agent.launch.before",
+        "onError": "pass"
+      }
+    ],
+    "events": [
+      {
+        "on": "workspace.changed"
+      }
+    ],
     "commands": [
-      { "id": "showPanel", "title": "Agent accounts: show panel", "action": "sidebar.right.toggle" }
+      {
+        "id": "showPanel",
+        "title": "Agent accounts: show panel",
+        "action": "sidebar.right.toggle"
+      }
     ],
     "statusBarItems": [
-      { "id": "account", "icon": "agent", "text": "Accounts: default", "command": "showPanel" }
+      {
+        "id": "account",
+        "icon": "agent",
+        "text": "Accounts: default",
+        "command": "showPanel"
+      }
     ]
   },
-  "capabilities": [{ "kind": "storage:own" }, { "kind": "workspace:read" }]
+  "capabilities": [
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "workspace:read"
+    }
+  ]
 }

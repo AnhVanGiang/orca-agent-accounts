@@ -14,6 +14,7 @@ import {
   Separator,
   set,
   Stack,
+  Switch,
   Text,
   type PanelContext
 } from 'orca'
@@ -33,6 +34,7 @@ type State = {
   workspaces: Workspace[]
   assignments: Assignments
   currentIds: string[]
+  trust: boolean
 }
 
 /** Select refuses an empty-string option value, so "no assignment" gets a sentinel. */
@@ -60,6 +62,16 @@ async function assign(provider: Provider, target: Target, value: string): Promis
       ...target,
       accountId: value === NONE ? null : value
     })
+    set(saveError, null)
+  } catch (e) {
+    set(saveError, e instanceof Error ? e.message : String(e))
+  }
+  await refresh()
+}
+
+async function setTrust(on: boolean): Promise<void> {
+  try {
+    await plugin.request('accounts.setTrust', { on })
     set(saveError, null)
   } catch (e) {
     set(saveError, e instanceof Error ? e.message : String(e))
@@ -314,6 +326,16 @@ export default function Panel() {
       ) : null}
 
       <Separator />
+      <Switch
+        label="Trust workspaces for picked Claude accounts"
+        checked={s.trust}
+        onChange={(on) => void setTrust(on)}
+      />
+      <Text muted size="xs">
+        With an account selected in Orca's Claude switcher, Orca trusts new folders in that account
+        only, so a picked account would stop at Claude's trust prompt. This writes the trust there
+        too, even for repos set to "let agents ask" in Orca. Turn it off if you rely on that.
+      </Text>
       <Text muted size="xs">
         Applies to Claude and Codex agents Orca's launcher starts in a terminal. Running sessions keep
         their account; move one with /resume in a new tab. Chats, resumed and restored tabs, `orca

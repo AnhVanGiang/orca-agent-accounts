@@ -1,5 +1,7 @@
 # Agent Accounts (Orca plugin)
 
+![Agent Accounts panel](images/cover.png)
+
 Pick which Claude Code and Codex account each repo or workspace in [Orca](https://github.com/stablyai/orca)
 runs its agents on. Work repos on your work login, side projects on your personal one, with no
 `.envrc` or other file in the worktree.
@@ -21,6 +23,14 @@ has not been tested end to end with a real second Codex account yet.
   own account switcher (Orca's env is applied earlier).
 - A missing or signed-out account blocks the launch with a message instead of starting on the wrong
   account.
+- Folder trust: on System default, Orca marks a new folder trusted in the picked Claude account
+  itself. With an account selected in Orca's Claude switcher, Orca marks it in that account only, so
+  the picked one would stop at Claude's trust prompt in each new worktree. In that case the plugin
+  writes the same trust record into the picked account at launch (never for the home folder or
+  above). A plugin cannot read Orca's trust settings, so this also applies to repos set to "let
+  agents ask" and when Orca's workspace trust is off; turn it off with the switch at the bottom of
+  the panel if you rely on those. Same file format and locking as Orca; ported from
+  [Claude Pin](https://github.com/tourbut/claude-pin) (MIT), a Claude-only plugin with the same idea.
 
 ## Install
 
@@ -67,8 +77,6 @@ Also:
   account shows Orca's choice, not this plugin's.
 - `/resume` in a Codex pane finds older sessions only when Orca's "share history across accounts"
   setting is on and Orca has bridged that account's history.
-- With an account selected in Orca's Claude switcher, Orca writes folder trust into that account,
-  not the routed one, so the routed account may ask to trust the folder once.
 
 ## Develop
 
@@ -84,4 +92,5 @@ See [DESIGN.md](DESIGN.md) for the decisions and how Orca's launch path was trac
 
 ## License
 
-MIT
+MIT. `worker/trust.ts` follows Orca's `claude-folder-trust-file.ts` as ported by Claude Pin (MIT,
+tourbut).

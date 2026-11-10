@@ -34,11 +34,17 @@ declare module 'orca' {
         assignments: Assignments
         /** Workspaces matching the focused one; several when a name is reused across repos. */
         currentIds: string[]
+        /** Mark a workspace trusted in its assigned Claude account at launch (default on). */
+        trust: boolean
       }
     }
     'accounts.assign': {
       /** One of path (this workspace) or repo (all its workspaces); null accountId clears. */
       input: { provider: Provider; path?: string; repo?: string; accountId: string | null }
+      output: { ok: true }
+    }
+    'accounts.setTrust': {
+      input: { on: boolean }
       output: { ok: true }
     }
   }

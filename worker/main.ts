@@ -11,6 +11,7 @@ import {
   type Provider,
   type Workspace
 } from '../src/protocol'
+import { grantTrust } from './trust'
 
 /** Orca's app data folder. macOS only: the worker cannot see Orca's own path, so others are not guessed. */
 const SUPPORTED = process.platform === 'darwin'
@@ -21,6 +22,15 @@ function readJson(path: string): any {
     return JSON.parse(readFileSync(path, 'utf8'))
   } catch {
     return null
+  }
+}
+
+/** Home of the account picked in Orca's own Claude switcher; '' for System default. */
+function selectedClaudeHome(): string {
+  try {
+    return readFileSync(join(ORCA_DATA, 'claude-profiles', 'selected-host'), 'utf8').trim()
+  } catch {
+    return ''
   }
 }
 
@@ -59,11 +69,7 @@ const SPEC: Record<
     root: join(ORCA_DATA, 'claude-profiles'),
     emailOf: claudeEmail,
     defaultLabel: () => {
-      // Orca's own Claude setting: this file holds the selected account's home, empty for System default.
-      let selected = ''
-      try {
-        selected = readFileSync(join(ORCA_DATA, 'claude-profiles', 'selected-host'), 'utf8').trim()
-      } catch {}
+      const selected = selectedClaudeHome()
       if (selected) return `Orca's setting (${claudeEmail(selected) ?? 'signed out'})`
       // ~/.claude keeps its .claude.json one level up, in the home folder.
       const mail = claudeEmail(homedir())
@@ -164,12 +170,14 @@ const shq = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`
 const empty = (): Assignments => ({ claude: {}, codex: {} })
 
 const activate: Activate = async (orca) => {
-  // Hook reads only these caches: an await inside the hook could pass the 2 s deadline.
+  // The hook reads these caches instead of calling Orca: it has a 2 s deadline. Its only await is the
+  // trust write, bounded at about 250 ms when Claude holds the config lock.
   const load = async (): Promise<Assignments> => ({
     ...empty(),
     ...((await orca.storage.get('assignments')) as Partial<Assignments> | null)
   })
   let assignments = await load()
+  let trust = (await orca.storage.get('trust')) !== false
   const folders = new Map<string, string>()
   const remotePaths = new Set<string>()
   let current: { branch: string; displayName: string } | null = null
@@ -214,6 +222,7 @@ const activate: Activate = async (orca) => {
   }
 
   orca.storage.onDidChange(async ({ key }) => {
+    if (key === 'trust') trust = (await orca.storage.get('trust')) !== false
     if (key !== 'assignments') return
     assignments = await load()
     await refreshStatus()
@@ -224,7 +233,7 @@ const activate: Activate = async (orca) => {
     await refreshStatus()
   })
 
-  orca.hooks.on('agent.launch.before', (event, next) => {
+  orca.hooks.on('agent.launch.before', async (event, next) => {
     const p = providerOfAgent(event.agent)
     const path = pathOf(event.workspaceId, folders)
     orca.log(`launch agent=${event.agent} workspaceId=${event.workspaceId}`)
@@ -242,6 +251,13 @@ const activate: Activate = async (orca) => {
       }
     }
     orca.log(`-> ${SPEC[p].env}=${home}`)
+    // Orca trusts the folder in the account it launches with. On System default that is this one
+    // (our env survives); with a switcher account selected, Orca's env wins and trust lands there.
+    const switcher = p === 'claude' ? selectedClaudeHome() : ''
+    if (trust && switcher && resolve(switcher) !== resolve(home)) {
+      const outcome = await grantTrust(home, path).catch((e) => `failed: ${String(e)}`)
+      orca.log(`trust ${path}: ${outcome}`)
+    }
     // Orca sets its own account env after this hook and would win; a command-line assignment is
     // applied by the shell last, and Orca's claude/codex shell functions keep it.
     const command = `${SPEC[p].env}=${shq(home)} ${event.command}`
@@ -257,8 +273,15 @@ const activate: Activate = async (orca) => {
       accounts: { claude: listAccounts('claude'), codex: listAccounts('codex') },
       workspaces: list,
       assignments,
-      currentIds: focusedCandidates(list, current).map((w) => w.id)
+      currentIds: focusedCandidates(list, current).map((w) => w.id),
+      trust
     }
+  })
+
+  orca.panels.handle('accounts.setTrust', async ({ on }) => {
+    await orca.storage.set('trust', on === true)
+    trust = on === true
+    return { ok: true as const }
   })
 
   // Warm the folder/remote caches and the status bar; workspace.changed may not fire again soon.
