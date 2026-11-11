@@ -58,5 +58,10 @@ did not open.
 
 1. Bump `version` in `orca-plugin.json`; update README, DESIGN and the agent manual.
 2. All checks above pass; live-check what changed.
-3. Commit and push to `main`.
-4. For the plugin directory: `orca plugin release-entry .` prints the catalog entry for HEAD.
+3. If the panel changed, rebuild the images from sample data: hide Orca, run
+   `orca plugin shot . --scenario "<name>" --theme <dark|light> --width 380 --out <shots>/<name-with-dashes>-<theme>.png`
+   for the scenarios `scripts/make_images.py` uses, then `python3 scripts/make_images.py <shots> images`.
+   Never shoot the live panel for these: it shows real accounts.
+4. Commit and push to `main`, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`. The Orca
+   directory (the repo has the `orca-plugin` topic) lists the newest `vX.Y.Z` tag within about an
+   hour; a version is pinned to its first commit and hash, so never move a pushed tag.

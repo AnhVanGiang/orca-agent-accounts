@@ -43,6 +43,18 @@ const withCodex = {
 export default defineCheck({
   loaded: { requests: { 'accounts.state': state } },
   'codex account added': { requests: { 'accounts.state': withCodex } },
+  'tabs on two accounts': {
+    requests: {
+      'accounts.state': {
+        ...state,
+        tabs: [
+          { terminalId: 'term_1', title: 'fix-x: review', accountId: '' },
+          { terminalId: 'term_2', title: 'fix-x: tests', accountId: 'p1' },
+          { terminalId: 'term_3', title: 'fix-x: docs', accountId: 'p1' }
+        ]
+      }
+    }
+  },
   'name in two repos': {
     requests: {
       'accounts.state': {

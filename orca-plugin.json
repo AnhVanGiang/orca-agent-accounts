@@ -5,7 +5,7 @@
   "id": "agent-accounts",
   "name": "Agent Accounts",
   "version": "0.2.0",
-  "description": "Pick which Claude Code and Codex account each repo or workspace runs its agents on, using the accounts you added in Orca. macOS only.",
+  "description": "Pick which Claude Code and Codex account each repo, workspace or tab runs its agents on, using the accounts you added in Orca. Move a running Claude tab to another account. macOS only.",
   "author": {
     "name": "AnhVanGiang",
     "url": "https://github.com/AnhVanGiang"
@@ -15,13 +15,18 @@
   "icon": "images/icon.png",
   "cover": {
     "path": "images/cover.png",
-    "alt": "Agent Accounts panel: a workspace on one Claude account and its repo on another, plus a Codex pick"
+    "alt": "Agent Accounts panel: per-workspace accounts, a New tab picker, and Claude tabs on two accounts with Move"
   },
   "screenshots": [
     {
       "path": "images/panel.png",
       "alt": "The panel in dark and light themes",
-      "caption": "Pick per repo, or override one workspace"
+      "caption": "Pick per repo, per workspace, or for one new tab"
+    },
+    {
+      "path": "images/tabs.png",
+      "alt": "Three Claude tabs on two accounts, each with an account picker and a Move button",
+      "caption": "Move a running Claude tab to another account"
     },
     {
       "path": "images/two-repos.png",
