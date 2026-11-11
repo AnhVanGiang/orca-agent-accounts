@@ -27,6 +27,7 @@ const state = {
   ],
   assignments: { claude: { 'repo:/r/ops': 'p1', '/r/app/.worktrees/fix-x': 'p1' }, codex: {} },
   currentIds: ['w2'],
+  tabs: [{ terminalId: 'term_1', title: 'fix-x agent', accountId: '' }],
   trust: true
 }
 

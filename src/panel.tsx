@@ -1,5 +1,6 @@
 import {
   atom,
+  Button,
   Callout,
   Card,
   Collapsible,
@@ -25,6 +26,7 @@ import {
   type Account,
   type Assignments,
   type Provider,
+  type TabInfo,
   type Workspace
 } from './protocol'
 
@@ -34,6 +36,7 @@ type State = {
   workspaces: Workspace[]
   assignments: Assignments
   currentIds: string[]
+  tabs: TabInfo[]
   trust: boolean
 }
 
@@ -67,6 +70,86 @@ async function assign(provider: Provider, target: Target, value: string): Promis
     set(saveError, e instanceof Error ? e.message : String(e))
   }
   await refresh()
+}
+
+/** "New tab" picker per `<provider>:<workspace id>`; unset = the account the workspace gets now. */
+const tabPick = atom<Record<string, string>>({})
+const tabNote = atom<string | null>(null)
+
+async function newTab(provider: Provider, ws: Workspace, value: string): Promise<void> {
+  set(tabNote, `Opening a ${PROVIDER_NAME[provider]} tab…`)
+  try {
+    await plugin.request('accounts.newTab', {
+      provider,
+      workspaceId: ws.id,
+      accountId: value === NONE ? null : value
+    })
+    set(tabNote, `Opened a ${PROVIDER_NAME[provider]} tab in ${ws.name}; it is in the tab bar, not focused.`)
+    set(saveError, null)
+  } catch (e) {
+    set(tabNote, null)
+    set(saveError, e instanceof Error ? e.message : String(e))
+  }
+}
+
+const movePick = atom<Record<string, string>>({})
+const moving = atom<string | null>(null)
+
+async function moveTab(tab: TabInfo, value: string): Promise<void> {
+  set(moving, tab.terminalId)
+  set(tabNote, `Moving ${tab.title}: stopping its Claude…`)
+  try {
+    await plugin.request(
+      'accounts.moveTab',
+      { terminalId: tab.terminalId, accountId: value === NONE ? null : value },
+      { timeoutMs: 60_000 }
+    )
+    set(tabNote, `Moved ${tab.title}: its conversation continues in a new tab.`)
+    set(saveError, null)
+  } catch (e) {
+    set(tabNote, null)
+    set(saveError, e instanceof Error ? e.message : String(e))
+  }
+  set(moving, null)
+  await refresh()
+}
+
+/** Each Claude tab here, its account, and a picker to move its conversation to another. */
+function TabsCard(props: { s: State }) {
+  const { s } = props
+  if (s.tabs.length === 0 || s.accounts.claude.length === 1) return null
+  return (
+    <Card title="Claude tabs here" description="Move stops the tab's Claude, even mid-turn, and resumes the conversation in a new tab.">
+      <Stack gap="md">
+        {s.tabs.map((t) => {
+          const now = t.accountId || NONE
+          const value = read(movePick)[t.terminalId] ?? now
+          return (
+            <Stack key={t.terminalId} gap="xs">
+              <Text weight="medium" truncate>{t.title}</Text>
+              <Text muted size="xs" truncate>{`Now on ${labelOf(s, 'claude', t.accountId)}`}</Text>
+              <Row gap="sm" align="end">
+                <Select
+                  label={`Account for ${t.title}`}
+                  labelHidden
+                  value={value}
+                  options={accountOptions(s, 'claude', labelOf(s, 'claude', ''), value)}
+                  onChange={(v) => set(movePick, { ...read(movePick), [t.terminalId]: String(v) })}
+                />
+                <Button
+                  icon="next"
+                  disabled={value === now || read(moving) !== null}
+                  onPress={() => void moveTab(t, value)}
+                >
+                  Move
+                </Button>
+              </Row>
+            </Stack>
+          )
+        })}
+      </Stack>
+    </Card>
+  )
 }
 
 async function setTrust(on: boolean): Promise<void> {
@@ -130,6 +213,8 @@ function ProviderSection(props: { p: Provider; ws: Workspace; s: State; count: n
   const own = s.assignments[p][ws.path] ?? NONE
   const canOverride = count > 1 || ws.path !== ws.repo
   const onlyDefault = s.accounts[p].length === 1
+  const assigned = s.assignments[p][ws.path] ?? s.assignments[p][REPO + ws.repo] ?? NONE
+  const pickValue = read(tabPick)[`${p}:${ws.id}`] ?? assigned
   return (
     <Stack gap="sm">
       <Heading level={3}>{PROVIDER_NAME[p]}</Heading>
@@ -147,6 +232,17 @@ function ProviderSection(props: { p: Provider; ws: Workspace; s: State; count: n
         </Text>
       ) : (
         <>
+          <Row gap="sm" align="end">
+            <Select
+              label="New tab on"
+              value={pickValue}
+              options={accountOptions(s, p, labelOf(s, p, ''), pickValue)}
+              onChange={(v) => set(tabPick, { ...read(tabPick), [`${p}:${ws.id}`]: String(v) })}
+            />
+            <Button icon="add" onPress={() => void newTab(p, ws, pickValue)}>
+              {`${PROVIDER_NAME[p]} tab`}
+            </Button>
+          </Row>
           <RepoPicker p={p} repo={ws.repo} s={s} label={`Whole repo (${plural(count, 'workspace')})`} />
           {canOverride ? (
             <Collapsible title="Different account for just this workspace" defaultOpen={own !== NONE}>
@@ -270,6 +366,7 @@ export default function Panel() {
 
   return (
     <Stack gap="md">
+      {read(tabNote) ? <Callout tone="success">{read(tabNote)}</Callout> : null}
       {read(saveError) ? (
         <Callout tone="danger" title="Could not save">{read(saveError)}</Callout>
       ) : null}
@@ -281,6 +378,7 @@ export default function Panel() {
       {focused.map((ws) => (
         <FocusedCard key={ws.id} ws={ws} s={s} ambiguous={focused.length > 1} count={count(ws.repo)} />
       ))}
+      <TabsCard s={s} />
       {focused.length === 0 ? (
         <Callout tone="neutral">Focus a workspace to pick its accounts.</Callout>
       ) : null}
@@ -337,7 +435,9 @@ export default function Panel() {
         too, even for repos set to "let agents ask" in Orca. Turn it off if you rely on that.
       </Text>
       <Text muted size="xs">
-        Applies to Claude and Codex agents Orca's launcher starts in a terminal. Running sessions keep
+        "New tab on" opens one agent tab on the account you pick, without changing the repo's
+        account; Orca's own + button cannot show a picker, so it is here. Accounts apply to Claude and
+        Codex agents Orca's launcher starts in a terminal. Running sessions keep
         their account; move one with /resume in a new tab. Chats, resumed and restored tabs, `orca
         terminal create --command`, and agents typed into a plain shell use Orca's own account setting.
       </Text>

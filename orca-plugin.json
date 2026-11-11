@@ -4,7 +4,7 @@
   "execution": "trusted-worker",
   "id": "agent-accounts",
   "name": "Agent Accounts",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Pick which Claude Code and Codex account each repo or workspace runs its agents on, using the accounts you added in Orca. macOS only.",
   "author": {
     "name": "AnhVanGiang",
@@ -77,6 +77,12 @@
     },
     {
       "kind": "workspace:read"
+    },
+    {
+      "kind": "agent:launch"
+    },
+    {
+      "kind": "terminal:send"
     }
   ]
 }

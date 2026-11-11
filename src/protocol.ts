@@ -18,6 +18,18 @@ export type Workspace = {
   repo: string
   remote: boolean
 }
+/** A Claude conversation running in an Orca terminal. `accountId` '' = ~/.claude. */
+export type ClaudeTab = {
+  terminalId: string
+  pid: number
+  sessionId: string
+  path: string
+  accountId: string
+  /** Claude's own session name, shown when Orca gives no tab title. */
+  name: string
+}
+/** What the panel sees of a tab in the focused workspace. */
+export type TabInfo = { terminalId: string; title: string; accountId: string }
 /** Worktree path, or `repo:<main checkout path>`, -> Orca account id. */
 export type Assignments = Record<Provider, Record<string, string>>
 
@@ -34,6 +46,8 @@ declare module 'orca' {
         assignments: Assignments
         /** Workspaces matching the focused one; several when a name is reused across repos. */
         currentIds: string[]
+        /** Claude tabs running in the focused workspace. */
+        tabs: TabInfo[]
         /** Mark a workspace trusted in its assigned Claude account at launch (default on). */
         trust: boolean
       }
@@ -42,6 +56,41 @@ declare module 'orca' {
       /** One of path (this workspace) or repo (all its workspaces); null accountId clears. */
       input: { provider: Provider; path?: string; repo?: string; accountId: string | null }
       output: { ok: true }
+    }
+    'accounts.newTab': {
+      /** Open a new agent tab on this account (null = Orca's default), whatever the repo or
+       *  workspace is assigned. The workspace: `workspaceId` (an id from accounts.state) or `path`
+       *  (any folder inside it). `prompt` is submitted once the agent is ready. */
+      input: {
+        provider: Provider
+        workspaceId?: string
+        path?: string
+        accountId: string | null
+        prompt?: string
+      }
+      output: { terminalId: string }
+    }
+    'accounts.tabs': {
+      /** Every Claude conversation running in an Orca terminal on this Mac. */
+      input: Record<string, never>
+      output: {
+        tabs: {
+          terminalId: string
+          name: string
+          sessionId: string
+          pid: number
+          path: string
+          workspaceId: string | null
+          workspaceName: string | null
+          accountId: string
+          account: string
+        }[]
+      }
+    }
+    'accounts.moveTab': {
+      /** Stop the tab's Claude and reopen its conversation on this account (null = default). */
+      input: { terminalId: string; accountId: string | null }
+      output: { terminalId: string }
     }
     'accounts.setTrust': {
       input: { on: boolean }

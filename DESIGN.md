@@ -39,6 +39,12 @@ UI, without files in the worktree.
 | 9 | macOS only | the worker cannot see Orca's data path; other platforms are not guessed |
 | 10 | Remote (hostId) workspaces pass through | the account folders are local |
 | 11 | `accounts.assign` accepts only listed account ids and workspaces | the id becomes a path |
+| 12 | Per-tab pick = one-shot entry `<provider>\0<path>`, set by `accounts.newTab`, consumed by the next launch hook there, then `agent.launch` | the hook gets no tab id before launch; a pick the hook never consumed is an error, never a silent default |
+| 13 | Move = find the tab's claude pid by `ORCA_TERMINAL_HANDLE` in `ps -E`, its conversation in `<account home>/sessions/<pid>.json`; interactive sessions only, refuse if several; Ctrl+C up to 4 times (Esc + `/exit` fails in vim mode), SIGTERM after ~12 s; open the resumed tab only once the pid is gone; close the old shell only once the new tab's Claude is running (15 s), else keep it and return the `claude --resume` command; refuse a Claude started outside the workspace root (the new tab opens at the root) | the plugin API gives no pid or session id; two processes on one transcript would corrupt it |
+| 14 | Resumed tab runs `--resume <id> --fork-session` | Orca adds its own `--session-id`, and Claude refuses `--resume` with it unless forking; the fork keeps the history and Orca keeps its id |
+| 15 | `newTab` types the prompt itself once the tab's `sessions/<pid>.json` exists, plus 1.5 s | Orca's `agent.launch` `prompt` is sent before the agent runs and is dropped (`agent_launch_terminal_not_running_agent`) |
+| 16 | Status bar lists every Claude tab of the focused workspace by account; 20 s `ps` tick; tooltip fitted to 256 chars | Orca gives no focused-tab id and no agent start/exit event; it rejects a longer tooltip |
+| 17 | Agent access = `orca plugin dev request` on a dev-loaded folder; no socket or CLI of our own | Orca refuses `dev request` for installed plugins and has no other CLI route; a second entry point would need its own access control |
 
 ## Not covered (no hook in Orca)
 
@@ -53,8 +59,14 @@ while Orca's switcher has an account selected.
 - Simulated with Orca's real zsh `claude` function: switcher account selected + env only ->
   switcher home; + command prefix -> assigned home.
 - Live: a chat-surface launch did not get the assigned account (expected, documented).
+- Live (Orca 1.4.255): `newTab` on a second Claude account, with and without a prompt;
+  `moveTab` default -> second account -> default with Ctrl+C, about 5 s each, history kept through
+  both forks (`--resume … --fork-session`), old tabs closed; an agent moving its own tab through
+  the CLI; `accounts.tabs` across all workspaces.
 
 ## Unverified
 
+- The status bar's per-tab text and tooltip on screen (unit-tested; no errors in the plugin log).
+- `newTab` with a prompt for Codex (a fixed 4 s wait before typing).
 - Codex end to end with a real second Codex account.
 - A live launch with an account selected in Orca's switcher.
