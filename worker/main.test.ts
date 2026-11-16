@@ -20,6 +20,16 @@ mkdirSync(join(data, 'codex-accounts/c1/home'), { recursive: true })
 writeFileSync(join(data, 'codex-accounts/c1/home/auth.json'), JSON.stringify({ tokens: { id_token: jwt({ email: 'cx@x' }) } }))
 process.env.HOME = home
 
+// Fake `ps` over rows of `pid comm args+env`: names for everyone, the environment only for `-p` pids.
+const fakePs = (rows: () => string[]) => async (args: string[]) => {
+  const cols = rows().map((r) => r.trim().split(/\s+/))
+  if (!args.includes('-E')) return cols.map(([pid, comm]) => ` ${pid} ${comm}`).join('\n')
+  assert.ok(args.includes('-p'), 'the environment is read for named pids only')
+  const pids = args[args.indexOf('-p') + 1].split(',')
+  assert.ok(cols.every(([pid, comm]) => !pids.includes(pid) || /(^|\/)claude$/.test(comm)), 'claude pids only')
+  return cols.filter(([pid]) => pids.includes(pid)).map(([pid, , ...rest]) => ` ${pid} ${rest.join(' ')}`).join('\n')
+}
+
 // Fake repo: main checkout /repo with a linked worktree /repo/.worktrees/w1.
 const repo = realpathSync(home) + '/repo'
 const wt = join(repo, '.worktrees/w1')
@@ -234,9 +244,11 @@ test('moveTab: stops the old Claude, then resumes its conversation on the picked
   writeFileSync(join(home, '.claude/sessions/4243.json'), JSON.stringify({ kind: 'interactive', sessionId: 'sess-2', cwd: repo }))
   let started = true // whether the new tab's Claude comes up
   let launched = false
-  main.sys.ps = async () =>
-    ` 4242 claude claude --x ORCA_TERMINAL_HANDLE=term_t1 HOME=${home}\n 99 zsh -zsh\n` +
-    (launched && started ? ' 4243 claude ORCA_TERMINAL_HANDLE=term_t2\n' : '')
+  main.sys.ps = fakePs(() => [
+    ` 4242 claude claude --x ORCA_TERMINAL_HANDLE=term_t1 HOME=${home}`,
+    ' 99 zsh -zsh ORCA_TERMINAL_HANDLE=term_t1',
+    ...(launched && started ? [' 4243 claude ORCA_TERMINAL_HANDLE=term_t2'] : [])
+  ])
   main.sys.alive = () => alive
   main.sys.stop = () => void (obeys === 'signal' && (alive = false))
   let worker: Awaited<ReturnType<typeof mountWorker>>
@@ -315,13 +327,12 @@ test('agents: tabs everywhere, newTab by a path inside the workspace with a prom
   writeFileSync(join(home, '.claude/sessions/503.json'), JSON.stringify({ kind: 'print', sessionId: 's-c', cwd: wt }))
   const real = { ...main.sys }
   let launched = false
-  main.sys.ps = async () =>
-    [
-      ' 501 claude claude ORCA_TERMINAL_HANDLE=term_a',
-      ' 502 /usr/bin/claude x ORCA_TERMINAL_HANDLE=term_b',
-      ' 503 claude -p ORCA_TERMINAL_HANDLE=term_a',
-      ...(launched ? [' 501 claude claude ORCA_TERMINAL_HANDLE=term_new'] : [])
-    ].join('\n')
+  main.sys.ps = fakePs(() => [
+    ' 501 claude claude ORCA_TERMINAL_HANDLE=term_a',
+    ' 502 /usr/bin/claude x ORCA_TERMINAL_HANDLE=term_b',
+    ' 503 claude -p ORCA_TERMINAL_HANDLE=term_a',
+    ...(launched ? [' 501 claude claude ORCA_TERMINAL_HANDLE=term_new'] : [])
+  ])
   let worker: Awaited<ReturnType<typeof mountWorker>>
   let fired: Promise<string> = Promise.resolve('')
   const withWt = [...listed, entry('w1', wt)]

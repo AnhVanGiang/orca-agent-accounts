@@ -25,6 +25,9 @@ For agents and humans changing this plugin. To *use* the plugin from an agent, r
 - Never start a launch on an account other than the one asked for: deny instead
   (DESIGN decision 4). Never open a resumed tab while the old Claude still runs (decision 13).
 - Process access goes through the exported `sys` object so tests can replace it.
+- Read the least you need. Never read every process's environment or arguments, or files outside the
+  account folders: find the target first by a narrow read (names, pids), then read only that.
+  Before a release, list each `ps`, file read and `terminal.*` call and what else it can see.
 - New access (a capability) changes the approval fingerprint: say so in the change.
 
 ## Check a change

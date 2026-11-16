@@ -74,6 +74,9 @@ is on. Choose another account and press **Move**. The plugin:
    history;
 3. closes the old tab.
 
+Ctrl+C, and the `exit` that closes the old tab, go only to the tab you move, and the SIGTERM only
+to that tab's Claude process. No other tab or process is touched.
+
 If the new tab does not start Claude within 15 seconds, the old tab stays open and the error
 shows the `claude --resume <id>` command that continues the conversation by hand. Moving works for Claude tabs only.
 
@@ -136,7 +139,8 @@ Any process running as you can call these handlers, the same as the `orca` CLI i
   wrong account.
 - **New tab** and **Move** set a one-time choice for the next launch in that workspace, then ask
   Orca to start the agent; the hook uses that choice instead of the repo's, once.
-- **Move** finds the tab's Claude by the tab handle Orca puts in its environment, and its
+- **Move** finds the tab's Claude by the tab handle Orca puts in its environment (it lists process
+  names first, then reads the environment of `claude` processes only), and its
   conversation in `sessions/<pid>.json` in the account folder. The new tab runs
   `claude --resume <id> --fork-session`: Orca starts every Claude tab with its own `--session-id`,
   which Claude accepts together with `--resume` only as a fork. The fork keeps the whole history,

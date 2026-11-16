@@ -92,8 +92,15 @@ const homeOf = (p: Provider, accountId: string) => join(SPEC[p].root, accountId,
 
 /** Process access, swapped out by the tests. */
 export const sys = {
-  ps: async (): Promise<string> =>
-    (await promisify(execFile)('ps', ['-Aww', '-E', '-o', 'pid=,comm=,args='], { maxBuffer: 64 << 20 })).stdout,
+  /** `ps` output. A nonzero exit (`-p` with a pid that has just exited) still yields what it printed. */
+  ps: async (args: string[]): Promise<string> =>
+    promisify(execFile)('ps', args, { maxBuffer: 16 << 20 }).then(
+      (r) => r.stdout,
+      (e: { stdout?: string }) => {
+        if (typeof e.stdout === 'string') return e.stdout
+        throw e
+      }
+    ),
   alive: (pid: number): boolean => {
     try {
       process.kill(pid, 0)
@@ -117,9 +124,15 @@ export async function claudeTabs(): Promise<ClaudeTab[]> {
   } catch {
     // No Orca accounts yet.
   }
+  // Names first, then the environment of `claude` processes only: never read every process's env.
+  const pids = (await sys.ps(['-Aww', '-o', 'pid=,comm=']))
+    .split('\n')
+    .map((line) => /^\s*(\d+)\s+(?:\S*\/)?claude\s*$/.exec(line)?.[1])
+    .filter((pid): pid is string => !!pid)
+  if (pids.length === 0) return []
   const tabs: ClaudeTab[] = []
-  for (const line of (await sys.ps()).split('\n')) {
-    const pid = /^\s*(\d+)\s+(?:\S*\/)?claude\s/.exec(line)?.[1]
+  for (const line of (await sys.ps(['-E', '-ww', '-o', 'pid=,args=', '-p', pids.join(',')])).split('\n')) {
+    const pid = /^\s*(\d+)\s/.exec(line)?.[1]
     const terminalId = /\bORCA_TERMINAL_HANDLE=(term_[\w-]+)/.exec(line)?.[1]
     if (!pid || !terminalId) continue
     for (const h of homes) {

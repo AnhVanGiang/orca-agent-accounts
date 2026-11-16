@@ -4,7 +4,7 @@
   "execution": "trusted-worker",
   "id": "agent-accounts",
   "name": "Agent Accounts",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Pick which Claude Code and Codex account each repo, workspace or tab runs its agents on, using the accounts you added in Orca. Move a running Claude tab to another account. macOS only.",
   "author": {
     "name": "AnhVanGiang",
